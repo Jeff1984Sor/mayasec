@@ -15,8 +15,26 @@ depends_on = None
 
 UUID = postgresql.UUID(as_uuid=True)
 
+# create_type=False: criamos os tipos UMA vez (abaixo) e referenciamos nas colunas
+# sem deixar o create_table tentar recriá-los (o que dava DuplicateObjectError).
+conversation_state = postgresql.ENUM(
+    "idle", "aguardando_confirmacao", "em_atendimento", "handoff_humano",
+    name="conversation_state", create_type=False,
+)
+message_direction = postgresql.ENUM(
+    "inbound", "outbound", name="message_direction", create_type=False,
+)
+handoff_status = postgresql.ENUM(
+    "open", "in_progress", "resolved", name="handoff_status", create_type=False,
+)
+
 
 def upgrade() -> None:
+    # Cria os tipos ENUM uma única vez (idempotente)
+    conversation_state.create(op.get_bind(), checkfirst=True)
+    message_direction.create(op.get_bind(), checkfirst=True)
+    handoff_status.create(op.get_bind(), checkfirst=True)
+
     # --- tenants ---
     op.create_table(
         "tenants",
@@ -63,11 +81,6 @@ def upgrade() -> None:
     op.create_index("ix_contacts_phone_pn", "contacts", ["phone_pn"])
 
     # --- conversations ---
-    conversation_state = postgresql.ENUM(
-        "idle", "aguardando_confirmacao", "em_atendimento", "handoff_humano",
-        name="conversation_state",
-    )
-    conversation_state.create(op.get_bind(), checkfirst=True)
     op.create_table(
         "conversations",
         sa.Column("id", UUID, primary_key=True),
@@ -80,8 +93,6 @@ def upgrade() -> None:
     op.create_index("ix_conversations_tenant_id", "conversations", ["tenant_id"])
 
     # --- messages ---
-    message_direction = postgresql.ENUM("inbound", "outbound", name="message_direction")
-    message_direction.create(op.get_bind(), checkfirst=True)
     op.create_table(
         "messages",
         sa.Column("id", UUID, primary_key=True),
@@ -131,8 +142,6 @@ def upgrade() -> None:
     op.create_index("ix_tool_configs_tenant_id", "tool_configs", ["tenant_id"])
 
     # --- handoffs ---
-    handoff_status = postgresql.ENUM("open", "in_progress", "resolved", name="handoff_status")
-    handoff_status.create(op.get_bind(), checkfirst=True)
     op.create_table(
         "handoffs",
         sa.Column("id", UUID, primary_key=True),
