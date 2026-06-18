@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Segredos — NUNCA comitar
+.env
+.env.local
+*.env
+
+# Node / Next (frontend, etapa 7)
+node_modules/
+.next/
+.env*.local
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
