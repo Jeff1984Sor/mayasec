@@ -38,8 +38,14 @@ class Settings(BaseSettings):
     wasender_base_url: str = Field(default="https://wasenderapi.com/api")
     wasender_webhook_secret: str = Field(
         default="",
-        description="Fallback global; o secret por tenant tem prioridade.",
+        description="Fallback global; o secret por sessão/tenant tem prioridade.",
     )
+    # Verificação da assinatura do webhook.
+    #   - verify=False: aceita tudo (use só no teste inicial até confirmar o formato).
+    #   - mode: "hmac_sha256" (HMAC do corpo) | "plain" (secret em texto puro no header).
+    wasender_verify_signature: bool = Field(default=False)
+    wasender_signature_mode: str = Field(default="hmac_sha256")
+    wasender_signature_header: str = Field(default="X-Wasender-Signature")
 
     # --- Criptografia das credenciais por tenant (Fernet) ---
     fernet_master_key: str = Field(

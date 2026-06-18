@@ -28,8 +28,10 @@ async def health() -> dict:
     return {"status": "ok", "app": settings.app_name, "env": settings.environment}
 
 
-# --- Routers (plugados nas próximas etapas) ---
-# from app.routers import webhook, tenants, knowledge_base, tool_config, conversations, messages
-# app.include_router(webhook.router)
-# app.include_router(tenants.router)
-# ...
+# --- Routers ---
+from app.routers import webhook, admin  # noqa: E402
+
+app.include_router(webhook.router)
+app.include_router(admin.router)
+
+# Próximas etapas: knowledge_base, tool_config, conversations, messages (CRUD do painel)
