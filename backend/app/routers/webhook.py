@@ -65,12 +65,12 @@ async def wasender_webhook(
         return _ok("ignored_unknown_session")
 
     # --- Filtro 0 (assinatura): só agora que temos o secret do tenant ---
-    cipher = get_cipher()
-    secret = None
-    # secret por sessão tem prioridade sobre o global
+    from app.core.config import settings
     from app.models.whatsapp_session import WhatsappSession  # local p/ evitar ciclo
     from sqlalchemy import select
 
+    secret = None
+    # secret por sessão tem prioridade sobre o global (só instancia o Fernet se precisar)
     ws = (
         await db.execute(
             select(WhatsappSession).where(WhatsappSession.session_id == session_id)
@@ -78,12 +78,10 @@ async def wasender_webhook(
     ).scalar_one_or_none()
     if ws and ws.webhook_secret_encrypted:
         try:
-            secret = cipher.decrypt(ws.webhook_secret_encrypted)
+            secret = get_cipher().decrypt(ws.webhook_secret_encrypted)
         except ValueError:
             secret = None
     if not secret:
-        from app.core.config import settings
-
         secret = settings.wasender_webhook_secret or None
 
     if not verify_signature(raw_body, x_wasender_signature, secret):
