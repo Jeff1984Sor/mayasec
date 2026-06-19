@@ -42,6 +42,7 @@ async def wasender_webhook(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     raw_body = await request.body()
+    logger.warning("WEBHOOK RAW: %s", raw_body.decode(errors="replace")[:2000])
 
     payload = WasenderWebhook.model_validate_json(raw_body)
     session_id = payload.session_id or (payload.data.session_id if payload.data else None)
