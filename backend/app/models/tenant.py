@@ -14,6 +14,7 @@ class Tenant(PKMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Personalização da secretária
+    assistant_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     voice_tone: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Menu/apresentação mostrado na primeira mensagem (orienta o cliente)
     welcome_menu: Mapped[str | None] = mapped_column(Text, nullable=True)

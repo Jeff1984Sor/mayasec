@@ -535,6 +535,7 @@ async def update_handoff(
 
 # ---------- Configurações ----------
 class ConfigIn(BaseModel):
+    assistant_name: str | None = None
     voice_tone: str | None = None
     welcome_menu: str | None = None
     playbook: str | None = None
@@ -551,6 +552,7 @@ async def get_config(user: User = Depends(get_current_user), db: AsyncSession = 
     return {
         "name": t.name,
         "slug": t.slug,
+        "assistant_name": t.assistant_name,
         "voice_tone": t.voice_tone,
         "welcome_menu": t.welcome_menu,
         "playbook": t.playbook,
@@ -567,6 +569,8 @@ async def update_config(
     body: ConfigIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     t = await db.get(Tenant, user.tenant_id)
+    if body.assistant_name is not None:
+        t.assistant_name = body.assistant_name
     if body.voice_tone is not None:
         t.voice_tone = body.voice_tone
     if body.welcome_menu is not None:

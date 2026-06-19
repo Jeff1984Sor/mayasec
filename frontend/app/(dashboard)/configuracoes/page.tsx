@@ -8,6 +8,7 @@ export default function ConfiguracoesPage() {
   const qc = useQueryClient();
   const cfg = useQuery({ queryKey: ["config"], queryFn: () => apiGet<any>("/panel/config") });
 
+  const [assistantName, setAssistantName] = useState("");
   const [voiceTone, setVoiceTone] = useState("");
   const [welcomeMenu, setWelcomeMenu] = useState("");
   const [playbook, setPlaybook] = useState("");
@@ -19,6 +20,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     if (cfg.data) {
+      setAssistantName(cfg.data.assistant_name || "");
       setVoiceTone(cfg.data.voice_tone || "");
       setWelcomeMenu(cfg.data.welcome_menu || "");
       setPlaybook(cfg.data.playbook || "");
@@ -32,6 +34,7 @@ export default function ConfiguracoesPage() {
   const save = useMutation({
     mutationFn: () =>
       apiSend("PUT", "/panel/config", {
+        assistant_name: assistantName,
         voice_tone: voiceTone,
         welcome_menu: welcomeMenu,
         playbook: playbook,
@@ -53,6 +56,8 @@ export default function ConfiguracoesPage() {
 
       <Card className="mb-4">
         <h3 className="mb-3 font-semibold text-navy">Secretária</h3>
+        <label className="mb-1 block text-sm font-medium">Nome da secretária</label>
+        <input value={assistantName} onChange={(e) => setAssistantName(e.target.value)} placeholder="Ex.: Michelle" className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo" />
         <label className="mb-1 block text-sm font-medium">Tom de voz</label>
         <textarea value={voiceTone} onChange={(e) => setVoiceTone(e.target.value)} rows={3} className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo" />
 

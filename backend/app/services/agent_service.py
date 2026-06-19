@@ -60,7 +60,8 @@ SECURITY_RULES = (
 async def _build_system_prompt(
     db: AsyncSession, tenant, contact, conversation, is_first: bool
 ) -> str:
-    parts = [f"Você é a Secretária Virtual de {tenant.name}, atendendo via WhatsApp."]
+    secretaria = tenant.assistant_name or "Secretária Virtual"
+    parts = [f"Você é {secretaria}, a secretária de {tenant.name}, atendendo via WhatsApp."]
     if tenant.voice_tone:
         parts.append(f"Tom de voz: {tenant.voice_tone}.")
     if contact.display_name:
@@ -71,7 +72,7 @@ async def _build_system_prompt(
         nome_txt = f" {primeiro_nome}" if primeiro_nome else ""
         saudacao_txt = (
             "Esta é a PRIMEIRA mensagem desta conversa. Comece cumprimentando neste estilo: "
-            f"\"Olá{nome_txt}, {_saudacao()}! Sou a Secretária Virtual de {tenant.name}.\""
+            f"\"Olá{nome_txt}, {_saudacao()}! Sou a {secretaria}, do {tenant.name}.\""
         )
         if tenant.welcome_menu:
             saudacao_txt += (
