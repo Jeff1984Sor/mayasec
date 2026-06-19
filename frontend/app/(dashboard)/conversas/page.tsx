@@ -65,6 +65,36 @@ export default function ConversasPage() {
     e.target.value = "";
   }
 
+  // --- Gravação de áudio direto no navegador ---
+  const [recording, setRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  async function toggleRecord() {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (ev) => ev.data.size && chunksRef.current.push(ev.data);
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/ogg" });
+        const file = new File([blob], `audio-${Date.now()}.ogg`, { type: "audio/ogg" });
+        sendMedia.mutate(file);
+        setRecording(false);
+      };
+      recorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch {
+      alert("Não consegui acessar o microfone. Verifique a permissão do navegador.");
+    }
+  }
+
   const rename = useMutation({
     mutationFn: ({ contactId, name }: { contactId: string; name: string }) =>
       apiSend("PATCH", `/panel/contacts/${contactId}`, { name }),
@@ -150,6 +180,23 @@ export default function ConversasPage() {
                   if (draft.trim()) reply.mutate(draft.trim());
                 }}
               >
+                <button
+                  type="button"
+                  onClick={toggleRecord}
+                  disabled={sendMedia.isPending}
+                  title={recording ? "Parar e enviar áudio" : "Gravar áudio"}
+                  className={`rounded-lg px-3 text-lg ${recording ? "bg-red text-white animate-pulse" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                >
+                  {recording ? "⏺" : "🎤"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectedConv && window.open(`tel:+${selectedConv.contact.phone_pn}`)}
+                  title="Ligar (abre o discador)"
+                  className="rounded-lg bg-slate-100 px-3 text-lg text-slate-600 hover:bg-slate-200"
+                >
+                  📞
+                </button>
                 <button
                   type="button"
                   onClick={() => mediaRef.current?.click()}
