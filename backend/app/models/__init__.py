@@ -8,9 +8,11 @@ from app.models.knowledge_base import KnowledgeBase
 from app.models.tool_config import ToolConfig
 from app.models.handoff import Handoff, HandoffStatus
 from app.models.user import User
+from app.models.material import Material
 
 __all__ = [
     "User",
+    "Material",
     "Tenant",
     "WhatsappSession",
     "Contact",

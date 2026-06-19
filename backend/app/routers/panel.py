@@ -18,6 +18,7 @@ from app.models.contact import Contact
 from app.models.conversation import Conversation
 from app.models.handoff import Handoff, HandoffStatus
 from app.models.knowledge_base import KnowledgeBase
+from app.models.material import Material
 from app.models.message import Message
 from app.models.conversation import ConversationState
 from app.models.message import MessageDirection
@@ -338,6 +339,58 @@ async def delete_faq(
     if f is None or f.tenant_id != user.tenant_id:
         raise HTTPException(404, "FAQ não encontrada")
     await db.delete(f)
+
+
+# ---------- Materiais (PDFs pré-cadastrados) ----------
+@router.get("/materials")
+async def list_materials(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rows = (
+        await db.execute(
+            select(Material).where(Material.tenant_id == user.tenant_id).order_by(Material.nome)
+        )
+    ).scalars().all()
+    return [
+        {"id": str(m.id), "nome": m.nome, "descricao": m.descricao, "arquivo": m.original_filename}
+        for m in rows
+    ]
+
+
+@router.post("/materials", status_code=201)
+async def create_material(
+    nome: str = Form(...),
+    descricao: str = Form(""),
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.main import MEDIA_DIR
+
+    ext = "." + file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else ""
+    stored = f"{uuid.uuid4().hex}{ext}"
+    (MEDIA_DIR / stored).write_bytes(await file.read())
+    mat = Material(
+        tenant_id=user.tenant_id,
+        nome=nome.strip(),
+        descricao=descricao.strip() or None,
+        stored_filename=stored,
+        original_filename=file.filename,
+        content_type=file.content_type,
+    )
+    db.add(mat)
+    await db.flush()
+    return {"id": str(mat.id), "nome": mat.nome}
+
+
+@router.delete("/materials/{material_id}", status_code=204)
+async def delete_material(
+    material_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    mat = await db.get(Material, material_id)
+    if mat is None or mat.tenant_id != user.tenant_id:
+        raise HTTPException(404, "material não encontrado")
+    await db.delete(mat)
 
 
 # ---------- Tools ----------

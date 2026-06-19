@@ -88,6 +88,19 @@ async def _build_system_prompt(
         linhas = "\n".join(f"- P: {f.question}\n  R: {f.answer}" for f in faq)
         parts.append("Base de conhecimento (use quando relevante):\n" + linhas)
 
+    # Materiais pré-cadastrados que a IA pode enviar (via tool enviar_material)
+    from app.models.material import Material
+
+    materiais = (
+        await db.execute(select(Material).where(Material.tenant_id == tenant.id))
+    ).scalars().all()
+    if materiais:
+        linhas = "\n".join(f"- {m.nome}" + (f": {m.descricao}" if m.descricao else "") for m in materiais)
+        parts.append(
+            "Materiais que você pode ENVIAR ao cliente (use a ferramenta enviar_material com o "
+            "nome exato quando o cliente pedir algo correspondente):\n" + linhas
+        )
+
     if conversation.state == ConversationState.aguardando_confirmacao:
         parts.append(
             "O contato havia sido convidado a confirmar presença em uma aula. Interprete a "

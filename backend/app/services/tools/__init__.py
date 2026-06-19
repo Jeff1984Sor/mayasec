@@ -8,6 +8,7 @@ from app.services.tools import (  # noqa: F401 — importa para registrar no reg
     confirmar_presenca,
     salvar_arquivo,
     enviar_arquivo,
+    enviar_material,
     registrar_handoff,
 )
 

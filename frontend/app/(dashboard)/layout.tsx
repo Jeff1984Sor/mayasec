@@ -6,6 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 const NAV = [
   { href: "/conversas", label: "Conversas" },
   { href: "/base-conhecimento", label: "Base de conhecimento" },
+  { href: "/materiais", label: "Materiais" },
   { href: "/tools", label: "Tools" },
   { href: "/handoffs", label: "Handoffs" },
   { href: "/configuracoes", label: "Configurações" },
