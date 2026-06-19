@@ -127,6 +127,77 @@ async def reply_conversation(
     return {"ok": True, "state": conversation.state.value}
 
 
+def _media_kind(content_type: str, filename: str) -> str:
+    ct = (content_type or "").lower()
+    if ct.startswith("image/"):
+        return "image"
+    if ct.startswith("audio/"):
+        return "audio"
+    if ct.startswith("video/"):
+        return "video"
+    return "document"
+
+
+@router.post("/conversations/{conversation_id}/reply-media")
+async def reply_media(
+    conversation_id: uuid.UUID,
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.core.config import settings
+    from app.main import MEDIA_DIR
+
+    conversation = await db.get(Conversation, conversation_id)
+    if conversation is None or conversation.tenant_id != user.tenant_id:
+        raise HTTPException(404, "conversa não encontrada")
+    if not settings.public_base_url:
+        raise HTTPException(400, "PUBLIC_BASE_URL não configurada no backend")
+
+    contact = await db.get(Contact, conversation.contact_id)
+    tenant = await db.get(Tenant, user.tenant_id)
+    session = (
+        await db.execute(
+            select(WhatsappSession)
+            .where(WhatsappSession.tenant_id == user.tenant_id)
+            .where(WhatsappSession.is_active.is_(True))
+        )
+    ).scalars().first()
+    if session is None:
+        raise HTTPException(400, "nenhuma sessão WhatsApp configurada")
+
+    # Salva o arquivo com nome único e monta a URL pública
+    ext = "." + file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else ""
+    stored = f"{uuid.uuid4().hex}{ext}"
+    (MEDIA_DIR / stored).write_bytes(await file.read())
+    media_url = f"{settings.public_base_url.rstrip('/')}/media/{stored}"
+    kind = _media_kind(file.content_type or "", file.filename or "")
+
+    await conv.set_state(db, conversation, ConversationState.handoff_humano)
+    await conv.log_message(
+        db,
+        tenant=tenant,
+        conversation=conversation,
+        contact=contact,
+        direction=MessageDirection.outbound,
+        body=f"[{kind}] {caption}".strip(),
+        raw_payload={"media_url": media_url, "kind": kind, "filename": file.filename},
+    )
+    try:
+        await wa.send_media(
+            session_id=session.session_id,
+            to=contact.phone_pn,
+            media_url=media_url,
+            kind=kind,
+            caption=caption or None,
+            filename=file.filename,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"mídia registrada mas falha no envio: {exc}") from exc
+    return {"ok": True, "kind": kind, "media_url": media_url}
+
+
 class StateIn(BaseModel):
     state: ConversationState
 

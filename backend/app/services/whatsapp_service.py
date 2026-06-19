@@ -37,23 +37,46 @@ async def is_flooding(
     return sent_recently >= max_msgs
 
 
-async def send_text(
-    *,
-    session_id: str,
-    to: str,
-    text: str,
-    api_key: str | None = None,
-) -> dict:
-    """Envia uma mensagem de texto pela WaSenderAPI.
-
-    Não persiste nada — quem chama é responsável por gravar o Message outbound.
-    """
+async def _post_send(payload: dict, api_key: str | None = None) -> dict:
     key = api_key or settings.wasender_api_key
     url = f"{settings.wasender_base_url.rstrip('/')}/send-message"
-    payload = {"sessionId": session_id, "to": to, "text": text}
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
         return resp.json() if resp.content else {}
+
+
+async def send_text(*, session_id: str, to: str, text: str, api_key: str | None = None) -> dict:
+    """Envia uma mensagem de texto pela WaSenderAPI."""
+    return await _post_send({"sessionId": session_id, "to": to, "text": text}, api_key)
+
+
+async def send_media(
+    *,
+    session_id: str,
+    to: str,
+    media_url: str,
+    kind: str,  # image | audio | video | document
+    caption: str | None = None,
+    filename: str | None = None,
+    api_key: str | None = None,
+) -> dict:
+    """Envia mídia (imagem, áudio, vídeo, PDF/documento) por URL pública."""
+    payload: dict = {"sessionId": session_id, "to": to}
+    if kind == "image":
+        payload["imageUrl"] = media_url
+        if caption:
+            payload["text"] = caption
+    elif kind == "audio":
+        payload["audioUrl"] = media_url
+    elif kind == "video":
+        payload["videoUrl"] = media_url
+        if caption:
+            payload["text"] = caption
+    else:  # document (PDF etc.)
+        payload["documentUrl"] = media_url
+        payload["fileName"] = filename or "arquivo"
+        if caption:
+            payload["text"] = caption
+    return await _post_send(payload, api_key)

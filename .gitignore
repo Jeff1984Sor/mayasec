@@ -16,6 +16,9 @@ node_modules/
 .next/
 .env*.local
 
+# Mídia enviada pelo painel (uploads)
+backend/media/
+
 # Editor / OS
 .vscode/
 .DS_Store

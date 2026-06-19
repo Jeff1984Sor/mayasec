@@ -3,10 +3,16 @@
 Etapa 1: apenas app + healthcheck + CORS. Os routers (webhook, tenants, etc.)
 serão plugados nas próximas etapas.
 """
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+
+MEDIA_DIR = Path(__file__).resolve().parent.parent / "media"
+MEDIA_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(
     title=settings.app_name,
@@ -35,3 +41,6 @@ app.include_router(webhook.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(panel.router)
+
+# Mídia enviada pelo painel (servida publicamente pra WaSender baixar)
+app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")

@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiSend } from "@/lib/api";
+import { apiGet, apiSend, apiUpload } from "@/lib/api";
 import { PageHeader, Card, EmptyState, Badge, Button } from "@/components/ui";
 
 const STATE_COLOR: Record<string, any> = {
@@ -43,6 +43,27 @@ export default function ConversasPage() {
     mutationFn: () => apiSend("PATCH", `/panel/conversations/${selected}/state`, { state: "idle" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["conversations"] }),
   });
+
+  const mediaRef = useRef<HTMLInputElement>(null);
+  const sendMedia = useMutation({
+    mutationFn: (f: File) => {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("caption", draft.trim());
+      return apiUpload(`/panel/conversations/${selected}/reply-media`, fd);
+    },
+    onSuccess: () => {
+      setDraft("");
+      qc.invalidateQueries({ queryKey: ["messages", selected] });
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+
+  function onPickMedia(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) sendMedia.mutate(f);
+    e.target.value = "";
+  }
 
   return (
     <div>
@@ -106,10 +127,26 @@ export default function ConversasPage() {
                   if (draft.trim()) reply.mutate(draft.trim());
                 }}
               >
+                <button
+                  type="button"
+                  onClick={() => mediaRef.current?.click()}
+                  disabled={sendMedia.isPending}
+                  title="Anexar imagem, áudio ou PDF"
+                  className="rounded-lg bg-slate-100 px-3 text-lg text-slate-600 hover:bg-slate-200"
+                >
+                  {sendMedia.isPending ? "…" : "📎"}
+                </button>
+                <input
+                  ref={mediaRef}
+                  type="file"
+                  accept="image/*,audio/*,application/pdf"
+                  className="hidden"
+                  onChange={onPickMedia}
+                />
                 <input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Responder como humano..."
+                  placeholder="Responder como humano... (vira legenda ao anexar)"
                   className="flex-1 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo"
                 />
                 <Button type="submit" disabled={reply.isPending || !draft.trim()}>

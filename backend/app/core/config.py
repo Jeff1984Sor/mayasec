@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # --- WaSenderAPI (gateway WhatsApp) ---
     wasender_api_key: str = Field(default="")
     wasender_base_url: str = Field(default="https://wasenderapi.com/api")
+    # URL pública do próprio backend (pra montar links de mídia que a WaSender baixa)
+    public_base_url: str = Field(default="")
     wasender_webhook_secret: str = Field(
         default="",
         description="Fallback global; o secret por sessão/tenant tem prioridade.",
