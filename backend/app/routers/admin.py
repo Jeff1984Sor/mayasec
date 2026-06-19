@@ -16,8 +16,10 @@ from app.core.security import get_cipher, mask_secret
 from app.models.contact import Contact
 from app.models.conversation import Conversation, ConversationState
 from app.models.tenant import Tenant
+from app.models.tool_config import ToolConfig
 from app.models.whatsapp_session import WhatsappSession
 from app.services import conversation_service as conv
+from app.services.tools import registry
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -175,3 +177,51 @@ async def set_conversation_state(body: StateSet, db: AsyncSession = Depends(get_
         raise HTTPException(404, "conversa não encontrada")
     await conv.set_state(db, conversation, body.state)
     return {"phone_pn": body.phone_pn, "state": conversation.state.value}
+
+
+# ---------- Tools ----------
+@router.get("/tools")
+async def list_registered_tools():
+    """Todas as tools conhecidas pelo registry (function declarations p/ o Gemini)."""
+    return [t.to_function_declaration() for t in registry.all()]
+
+
+class ToolToggle(BaseModel):
+    tenant_slug: str
+    tool_name: str
+    is_enabled: bool = True
+
+
+@router.post("/tools/toggle")
+async def toggle_tool(body: ToolToggle, db: AsyncSession = Depends(get_db)):
+    if registry.get(body.tool_name) is None:
+        raise HTTPException(404, f"tool '{body.tool_name}' não existe")
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == body.tenant_slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{body.tenant_slug}' não encontrado")
+    tc = (
+        await db.execute(
+            select(ToolConfig)
+            .where(ToolConfig.tenant_id == tenant.id)
+            .where(ToolConfig.tool_name == body.tool_name)
+        )
+    ).scalar_one_or_none()
+    if tc is None:
+        tc = ToolConfig(tenant_id=tenant.id, tool_name=body.tool_name)
+        db.add(tc)
+    tc.is_enabled = body.is_enabled
+    await db.flush()
+    return {"tool_name": tc.tool_name, "is_enabled": tc.is_enabled}
+
+
+@router.get("/tenants/{slug}/active-tools")
+async def list_active_tools(slug: str, db: AsyncSession = Depends(get_db)):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{slug}' não encontrado")
+    tools = await registry.get_active_tools(db, tenant)
+    return {"active": [t.name for t in tools]}
