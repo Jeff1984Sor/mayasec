@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     antiflood_max_msgs: int = 5
     antiflood_window_seconds: int = 30
 
+    # --- Confirmação de aula: timeout do estado aguardando_confirmacao (6h) ---
+    confirmation_timeout_seconds: int = 21600
+
     # --- CORS (painel Next.js na 3000) ---
     cors_origins: str = Field(default="http://localhost:3001")  # 3000 já ocupada no prod2
 

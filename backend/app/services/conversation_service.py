@@ -3,9 +3,12 @@
 Núcleo do anti-conflito (barreira 3): decide se a mensagem recebida é uma resposta
 de confirmação ou uma pergunta nova pra secretária, pelo estado da conversa.
 """
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.contact import Contact
 from app.models.conversation import Conversation, ConversationState
 from app.models.message import Message, MessageDirection
@@ -85,4 +88,24 @@ async def set_state(
     db: AsyncSession, conversation: Conversation, state: ConversationState
 ) -> None:
     conversation.state = state
+    conversation.state_changed_at = datetime.now(timezone.utc)
     await db.flush()
+
+
+async def expire_confirmation_if_stale(
+    db: AsyncSession, conversation: Conversation
+) -> bool:
+    """Se está em aguardando_confirmacao há mais que o timeout, volta pra idle.
+
+    Retorna True se expirou (e mudou o estado).
+    """
+    if conversation.state != ConversationState.aguardando_confirmacao:
+        return False
+    changed = conversation.state_changed_at
+    if changed is None:
+        return False
+    age = datetime.now(timezone.utc) - changed
+    if age >= timedelta(seconds=settings.confirmation_timeout_seconds):
+        await set_state(db, conversation, ConversationState.idle)
+        return True
+    return False

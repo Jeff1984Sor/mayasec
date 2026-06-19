@@ -6,7 +6,7 @@ Pydantic v2 + PostgreSQL + Alembic. Porta **8011** (8001 já está ocupada no pr
 ## Status da construção
 - [x] **Etapa 1** — esqueleto: `config`, `database`, `security` (Fernet), models + 1ª migration, `main.py` (health).
 - [x] **Etapa 2** — gateway webhook (`/webhook/wasender`, 3 filtros anti-conflito + log + anti-flood) + router admin p/ provisionar tenant/sessão.
-- [ ] Etapa 3 — máquina de estados + fluxo de confirmação.
+- [x] **Etapa 3** — máquina de estados (timeout 6h + respeita handoff), identificação do contato no sistema do cliente (`client_api` + mock), config da conexão via admin.
 - [ ] Etapa 4 — camada de tools (base + client_api + registry + 7 tools).
 - [ ] Etapa 5 — gemini_client + agent_service.
 - [ ] Etapa 6 — whatsapp_service + anti-flood.

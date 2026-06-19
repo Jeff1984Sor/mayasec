@@ -13,8 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_cipher, mask_secret
+from app.models.contact import Contact
+from app.models.conversation import Conversation, ConversationState
 from app.models.tenant import Tenant
 from app.models.whatsapp_session import WhatsappSession
+from app.services import conversation_service as conv
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -109,3 +112,66 @@ async def create_session(body: SessionCreate, db: AsyncSession = Depends(get_db)
         has_webhook_secret=encrypted is not None,
         webhook_secret_masked=mask_secret(body.webhook_secret) if body.webhook_secret else None,
     )
+
+
+# ---------- Conexão com o sistema do cliente ----------
+class ClientApiConfig(BaseModel):
+    base_url: str | None = None
+    credential: str | None = None  # criptografado
+    auth_scheme: str = "bearer"  # bearer | header | none
+    auth_header: str | None = None
+    mock: bool = True
+
+
+@router.patch("/tenants/{slug}/client-api")
+async def set_client_api(slug: str, body: ClientApiConfig, db: AsyncSession = Depends(get_db)):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{slug}' não encontrado")
+    tenant.client_api_base_url = body.base_url
+    tenant.client_api_auth_scheme = body.auth_scheme
+    tenant.client_api_auth_header = body.auth_header
+    tenant.client_api_mock = body.mock
+    if body.credential:
+        tenant.client_api_credential_encrypted = get_cipher().encrypt(body.credential)
+    await db.flush()
+    return {
+        "slug": tenant.slug,
+        "base_url": tenant.client_api_base_url,
+        "mock": tenant.client_api_mock,
+        "has_credential": tenant.client_api_credential_encrypted is not None,
+    }
+
+
+# ---------- Estado da conversa (teste de handoff/confirmação) ----------
+class StateSet(BaseModel):
+    tenant_slug: str
+    phone_pn: str
+    state: ConversationState
+
+
+@router.post("/conversations/state")
+async def set_conversation_state(body: StateSet, db: AsyncSession = Depends(get_db)):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == body.tenant_slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{body.tenant_slug}' não encontrado")
+    contact = (
+        await db.execute(
+            select(Contact)
+            .where(Contact.tenant_id == tenant.id)
+            .where(Contact.phone_pn == body.phone_pn)
+        )
+    ).scalar_one_or_none()
+    if contact is None:
+        raise HTTPException(404, "contato não encontrado")
+    conversation = (
+        await db.execute(select(Conversation).where(Conversation.contact_id == contact.id))
+    ).scalar_one_or_none()
+    if conversation is None:
+        raise HTTPException(404, "conversa não encontrada")
+    await conv.set_state(db, conversation, body.state)
+    return {"phone_pn": body.phone_pn, "state": conversation.state.value}

@@ -20,6 +20,15 @@ class Tenant(PKMixin, TimestampMixin, Base):
     antiflood_max_msgs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     antiflood_window_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Conexão com a API do sistema do cliente (contrato de integração, seção 6).
+    # As tools reusam esta mesma conexão; tool_config só liga/desliga cada tool.
+    client_api_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    client_api_credential_encrypted: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    client_api_auth_scheme: Mapped[str] = mapped_column(String(32), default="bearer", nullable=False)
+    client_api_auth_header: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Modo mock: responde dados fake sem chamar a API real (pra testar sem o PilatesFinal).
+    client_api_mock: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     # Relacionamentos
     whatsapp_sessions = relationship(
         "WhatsappSession", back_populates="tenant", cascade="all, delete-orphan"

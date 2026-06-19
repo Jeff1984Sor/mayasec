@@ -20,6 +20,7 @@ from app.core.security import get_cipher
 from app.models.conversation import ConversationState
 from app.models.message import MessageDirection
 from app.schemas.webhook import WasenderWebhook
+from app.services import contact_identity as identity
 from app.services import conversation_service as conv
 from app.services import whatsapp_service as wa
 from app.services.signature import verify_signature
@@ -97,6 +98,18 @@ async def wasender_webhook(
     # --- Resolve contato + conversa, grava a mensagem recebida ---
     contact = await conv.get_or_create_contact(db, tenant, phone_pn)
     conversation = await conv.get_or_create_conversation(db, tenant, contact)
+
+    # --- Identificação no sistema do cliente (se ainda não tem nome) ---
+    if not contact.display_name:
+        try:
+            ident = await identity.identify(tenant, phone_pn)
+            if ident:
+                contact.display_name = ident.get("nome")
+                conversation.context = {**(conversation.context or {}), "identity": ident}
+                await db.flush()
+        except Exception:  # noqa: BLE001 — identificação é best-effort
+            logger.exception("falha na identificação do contato %s", phone_pn)
+
     await conv.log_message(
         db,
         tenant=tenant,
@@ -108,13 +121,21 @@ async def wasender_webhook(
         raw_payload=payload.model_dump(mode="json"),
     )
 
+    # Timeout de 6h: se a confirmação ficou velha, volta pra idle (vira pergunta nova).
+    await conv.expire_confirmation_if_stale(db, conversation)
+
     # --- Máquina de estados: confirmação x pergunta nova ---
+    if conversation.state == ConversationState.handoff_humano:
+        # Um humano assumiu — a secretária NÃO responde (só registrou a mensagem).
+        return _ok("human_handoff")
+
     if conversation.state == ConversationState.aguardando_confirmacao:
-        # TODO (etapa 3): tratar resposta de confirmação (sim/não) sem chamar a IA.
-        reply = "Recebi sua confirmação. (fluxo de confirmação entra na etapa 3)"
+        # A IA interpreta a confirmação (etapa 5). Por ora, placeholder.
+        nome = contact.display_name or "tudo bem"
+        reply = f"Recebi sua resposta, {nome}! (interpretação da confirmação entra na etapa 5)"
     else:
-        # TODO (etapa 5): chamar agent_service (IA + tools).
-        reply = "Oi! Sou a secretária virtual. (a IA entra na etapa 5)"
+        nome = contact.display_name or "Oi"
+        reply = f"{nome}, sou a secretária virtual. (a IA entra na etapa 5)"
 
     # --- Anti-flood antes de responder ---
     if await wa.is_flooding(db, tenant, contact.id):
