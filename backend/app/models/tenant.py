@@ -17,6 +17,8 @@ class Tenant(PKMixin, TimestampMixin, Base):
     voice_tone: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Menu/apresentação mostrado na primeira mensagem (orienta o cliente)
     welcome_menu: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Roteiro de atendimento/vendas que a IA deve conduzir (script multi-etapas)
+    playbook: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Anti-flood por tenant (sobrescreve os defaults globais)
     antiflood_max_msgs: Mapped[int | None] = mapped_column(Integer, nullable=True)

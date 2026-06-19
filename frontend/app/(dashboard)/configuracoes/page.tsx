@@ -10,6 +10,7 @@ export default function ConfiguracoesPage() {
 
   const [voiceTone, setVoiceTone] = useState("");
   const [welcomeMenu, setWelcomeMenu] = useState("");
+  const [playbook, setPlaybook] = useState("");
   const [maxMsgs, setMaxMsgs] = useState<string>("");
   const [windowS, setWindowS] = useState<string>("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -20,6 +21,7 @@ export default function ConfiguracoesPage() {
     if (cfg.data) {
       setVoiceTone(cfg.data.voice_tone || "");
       setWelcomeMenu(cfg.data.welcome_menu || "");
+      setPlaybook(cfg.data.playbook || "");
       setMaxMsgs(cfg.data.antiflood_max_msgs ?? "");
       setWindowS(cfg.data.antiflood_window_seconds ?? "");
       setBaseUrl(cfg.data.client_api_base_url || "");
@@ -32,6 +34,7 @@ export default function ConfiguracoesPage() {
       apiSend("PUT", "/panel/config", {
         voice_tone: voiceTone,
         welcome_menu: welcomeMenu,
+        playbook: playbook,
         antiflood_max_msgs: maxMsgs === "" ? null : Number(maxMsgs),
         antiflood_window_seconds: windowS === "" ? null : Number(windowS),
         client_api_base_url: baseUrl,
@@ -62,6 +65,16 @@ export default function ConfiguracoesPage() {
           className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo"
         />
         <p className="mt-1 text-xs text-slate-400">Deixe em branco para a IA só perguntar "em que posso ajudar?".</p>
+
+        <label className="mb-1 mt-4 block text-sm font-medium">Roteiro de atendimento (script de vendas)</label>
+        <textarea
+          value={playbook}
+          onChange={(e) => setPlaybook(e.target.value)}
+          rows={10}
+          placeholder={"Cole aqui o script em etapas. A IA conduz a conversa seguindo o roteiro, personaliza com o nome e o objetivo do cliente, e avança uma etapa por vez."}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-indigo"
+        />
+        <p className="mt-1 text-xs text-slate-400">Use [Nome do Cliente], [objetivo] etc. — a IA substitui sozinha. Não invente valores/horários fora do roteiro.</p>
       </Card>
 
       <Card className="mb-4">

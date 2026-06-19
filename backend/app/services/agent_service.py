@@ -114,6 +114,17 @@ async def _build_system_prompt(
             "resposta dele e, se confirmar ou cancelar, use a ferramenta confirmar_presenca."
         )
 
+    if tenant.playbook:
+        parts.append(
+            "ROTEIRO DE ATENDIMENTO — siga este script conduzindo a conversa em etapas, de "
+            "forma natural e humana. Personalize com o nome da pessoa e com o que ela disser "
+            "(substitua trechos entre colchetes como [Nome do Cliente] e [objetivo]). Avance "
+            "uma etapa por vez conforme a pessoa responde; não despeje tudo de uma vez. NUNCA "
+            "invente valores, horários ou dados que não estejam no roteiro ou que não vieram de "
+            "uma ferramenta — se precisar de um horário real e não tiver, pergunte a preferência "
+            "da pessoa e ofereça encaminhar o agendamento.\n\n" + tenant.playbook
+        )
+
     parts.append(CORDIALIDADE)
     parts.append(SECURITY_RULES)
     return "\n\n".join(parts)
