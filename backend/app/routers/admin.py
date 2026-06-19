@@ -274,6 +274,48 @@ async def create_faq(body: FaqCreate, db: AsyncSession = Depends(get_db)):
     return {"id": str(faq.id), "question": faq.question}
 
 
+class FaqItem(BaseModel):
+    question: str
+    answer: str
+    tags: list[str] | None = None
+
+
+class FaqBulk(BaseModel):
+    tenant_slug: str
+    items: list[FaqItem]
+    replace: bool = False  # se true, apaga a FAQ existente antes de inserir
+
+
+@router.post("/faq/bulk", status_code=201)
+async def create_faq_bulk(body: FaqBulk, db: AsyncSession = Depends(get_db)):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == body.tenant_slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{body.tenant_slug}' não encontrado")
+
+    if body.replace:
+        existentes = (
+            await db.execute(
+                select(KnowledgeBase).where(KnowledgeBase.tenant_id == tenant.id)
+            )
+        ).scalars().all()
+        for f in existentes:
+            await db.delete(f)
+
+    for item in body.items:
+        db.add(
+            KnowledgeBase(
+                tenant_id=tenant.id,
+                question=item.question,
+                answer=item.answer,
+                tags=item.tags,
+            )
+        )
+    await db.flush()
+    return {"inseridas": len(body.items), "replace": body.replace}
+
+
 @router.get("/tenants/{slug}/active-tools")
 async def list_active_tools(slug: str, db: AsyncSession = Depends(get_db)):
     tenant = (
