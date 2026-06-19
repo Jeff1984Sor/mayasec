@@ -9,6 +9,7 @@ export default function ConfiguracoesPage() {
   const cfg = useQuery({ queryKey: ["config"], queryFn: () => apiGet<any>("/panel/config") });
 
   const [voiceTone, setVoiceTone] = useState("");
+  const [welcomeMenu, setWelcomeMenu] = useState("");
   const [maxMsgs, setMaxMsgs] = useState<string>("");
   const [windowS, setWindowS] = useState<string>("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -18,6 +19,7 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     if (cfg.data) {
       setVoiceTone(cfg.data.voice_tone || "");
+      setWelcomeMenu(cfg.data.welcome_menu || "");
       setMaxMsgs(cfg.data.antiflood_max_msgs ?? "");
       setWindowS(cfg.data.antiflood_window_seconds ?? "");
       setBaseUrl(cfg.data.client_api_base_url || "");
@@ -29,6 +31,7 @@ export default function ConfiguracoesPage() {
     mutationFn: () =>
       apiSend("PUT", "/panel/config", {
         voice_tone: voiceTone,
+        welcome_menu: welcomeMenu,
         antiflood_max_msgs: maxMsgs === "" ? null : Number(maxMsgs),
         antiflood_window_seconds: windowS === "" ? null : Number(windowS),
         client_api_base_url: baseUrl,
@@ -48,7 +51,17 @@ export default function ConfiguracoesPage() {
       <Card className="mb-4">
         <h3 className="mb-3 font-semibold text-navy">Secretária</h3>
         <label className="mb-1 block text-sm font-medium">Tom de voz</label>
-        <textarea value={voiceTone} onChange={(e) => setVoiceTone(e.target.value)} rows={3} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo" />
+        <textarea value={voiceTone} onChange={(e) => setVoiceTone(e.target.value)} rows={3} className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo" />
+
+        <label className="mb-1 block text-sm font-medium">Menu de boas-vindas (mostrado na 1ª mensagem)</label>
+        <textarea
+          value={welcomeMenu}
+          onChange={(e) => setWelcomeMenu(e.target.value)}
+          rows={5}
+          placeholder={"Ex.:\nPosso te ajudar com:\n• Fatura / 2ª via\n• Sua próxima aula\n• Tabela de produtos\n• Falar com um atendente"}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo"
+        />
+        <p className="mt-1 text-xs text-slate-400">Deixe em branco para a IA só perguntar "em que posso ajudar?".</p>
       </Card>
 
       <Card className="mb-4">

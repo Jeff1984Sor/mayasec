@@ -69,12 +69,19 @@ async def _build_system_prompt(
     if is_first:
         primeiro_nome = (contact.display_name or "").split(" ")[0] if contact.display_name else ""
         nome_txt = f" {primeiro_nome}" if primeiro_nome else ""
-        parts.append(
-            "Esta é a PRIMEIRA mensagem desta conversa. Comece a resposta cumprimentando "
-            f"exatamente neste estilo: \"Olá{nome_txt}, {_saudacao()}! Sou a Secretária Virtual "
-            f"de {tenant.name}. Em que posso ajudar?\" — e só depois trate o que a pessoa pediu, "
-            "se ela já tiver pedido algo."
+        saudacao_txt = (
+            "Esta é a PRIMEIRA mensagem desta conversa. Comece cumprimentando neste estilo: "
+            f"\"Olá{nome_txt}, {_saudacao()}! Sou a Secretária Virtual de {tenant.name}.\""
         )
+        if tenant.welcome_menu:
+            saudacao_txt += (
+                " Em seguida, apresente este menu/opções ao cliente (pode adaptar levemente o "
+                f"formato, mantendo o conteúdo):\n{tenant.welcome_menu}"
+            )
+        else:
+            saudacao_txt += " Em que posso ajudar?"
+        saudacao_txt += " Depois trate o que a pessoa pediu, se ela já tiver pedido algo."
+        parts.append(saudacao_txt)
 
     # FAQ (knowledge_base) ativa do tenant
     faq = (

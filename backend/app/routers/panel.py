@@ -491,6 +491,7 @@ async def update_handoff(
 # ---------- Configurações ----------
 class ConfigIn(BaseModel):
     voice_tone: str | None = None
+    welcome_menu: str | None = None
     antiflood_max_msgs: int | None = None
     antiflood_window_seconds: int | None = None
     client_api_base_url: str | None = None
@@ -505,6 +506,7 @@ async def get_config(user: User = Depends(get_current_user), db: AsyncSession = 
         "name": t.name,
         "slug": t.slug,
         "voice_tone": t.voice_tone,
+        "welcome_menu": t.welcome_menu,
         "antiflood_max_msgs": t.antiflood_max_msgs,
         "antiflood_window_seconds": t.antiflood_window_seconds,
         "client_api_base_url": t.client_api_base_url,
@@ -520,6 +522,8 @@ async def update_config(
     t = await db.get(Tenant, user.tenant_id)
     if body.voice_tone is not None:
         t.voice_tone = body.voice_tone
+    if body.welcome_menu is not None:
+        t.welcome_menu = body.welcome_menu
     if body.antiflood_max_msgs is not None:
         t.antiflood_max_msgs = body.antiflood_max_msgs
     if body.antiflood_window_seconds is not None:
