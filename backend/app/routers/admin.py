@@ -4,9 +4,11 @@ Etapa 2: só o suficiente pra cadastrar o primeiro tenant (PilatesFinal) e a ses
 da Flavia, e assim conseguir testar o webhook ponta a ponta. O CRUD completo do
 painel vem nas próximas etapas.
 """
+import csv
+import io
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -314,6 +316,66 @@ async def create_faq_bulk(body: FaqBulk, db: AsyncSession = Depends(get_db)):
         )
     await db.flush()
     return {"inseridas": len(body.items), "replace": body.replace}
+
+
+def _parse_faq_file(filename: str, content: bytes) -> list[tuple[str, str]]:
+    """Lê pares (pergunta, resposta) de um .xlsx (col A/B) ou .csv (2 colunas)."""
+    name = (filename or "").lower()
+    pares: list[tuple[str, str]] = []
+
+    if name.endswith(".xlsx"):
+        from openpyxl import load_workbook
+
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb.active
+        for row in ws.iter_rows(values_only=True):
+            if not row or len(row) < 2:
+                continue
+            q, a = row[0], row[1]
+            if q is None or a is None:
+                continue
+            pares.append((str(q).strip(), str(a).strip()))
+    else:  # csv
+        text = content.decode("utf-8-sig", errors="replace")
+        for row in csv.reader(io.StringIO(text)):
+            if len(row) < 2 or not row[0].strip() or not row[1].strip():
+                continue
+            pares.append((row[0].strip(), row[1].strip()))
+
+    # Remove cabeçalho comum (pergunta/resposta, question/answer)
+    if pares and pares[0][0].lower() in {"pergunta", "question", "perguntas"}:
+        pares = pares[1:]
+    return pares
+
+
+@router.post("/faq/upload", status_code=201)
+async def upload_faq(
+    tenant_slug: str = Form(...),
+    replace: bool = Form(False),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == tenant_slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{tenant_slug}' não encontrado")
+
+    content = await file.read()
+    pares = _parse_faq_file(file.filename, content)
+    if not pares:
+        raise HTTPException(400, "nenhuma linha válida encontrada (esperado 2 colunas: pergunta, resposta)")
+
+    if replace:
+        for f in (
+            await db.execute(select(KnowledgeBase).where(KnowledgeBase.tenant_id == tenant.id))
+        ).scalars().all():
+            await db.delete(f)
+
+    for q, a in pares:
+        db.add(KnowledgeBase(tenant_id=tenant.id, question=q, answer=a))
+    await db.flush()
+    return {"inseridas": len(pares), "replace": replace}
 
 
 @router.get("/tenants/{slug}/active-tools")
