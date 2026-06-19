@@ -81,6 +81,15 @@ async def log_message(
     )
     db.add(msg)
     await db.flush()
+
+    # Sincroniza a mensagem para a aba WhatsApp do aluno no sistema do cliente (best-effort)
+    from app.services import pilates_sync
+
+    try:
+        await pilates_sync.maybe_push(tenant, conversation, contact, direction, body)
+    except Exception:  # noqa: BLE001 — sync nunca quebra o fluxo
+        pass
+
     return msg
 
 
