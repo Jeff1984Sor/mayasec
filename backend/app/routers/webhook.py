@@ -148,24 +148,21 @@ async def wasender_webhook(
         logger.warning("anti-flood: silenciando resposta para contato %s", phone_pn)
         return _ok("rate_limited")
 
-    # --- Envia e registra a saída ---
+    # --- Registra a saída SEMPRE (log do que a secretária disse) ---
+    await conv.log_message(
+        db,
+        tenant=tenant,
+        conversation=conversation,
+        contact=contact,
+        direction=MessageDirection.outbound,
+        body=reply,
+    )
+
+    # --- Tenta entregar via WaSender (falha de entrega não apaga o log) ---
     try:
-        await wa.send_text(
-            session_id=session_id,
-            to=phone_pn,
-            text=reply,
-            api_key=None,
-        )
-        await conv.log_message(
-            db,
-            tenant=tenant,
-            conversation=conversation,
-            contact=contact,
-            direction=MessageDirection.outbound,
-            body=reply,
-        )
+        await wa.send_text(session_id=session_id, to=phone_pn, text=reply, api_key=None)
     except Exception:  # noqa: BLE001 — não derruba o webhook por falha de envio
         logger.exception("falha ao enviar resposta via WaSender")
-        return _ok("reply_failed")
+        return _ok("logged_send_failed")
 
     return _ok("ok")
