@@ -4,6 +4,8 @@ Monta o system prompt do tenant (tom de voz + FAQ + regras de segurança), injet
 histórico recente, expõe as tools ativas via function calling e devolve a resposta.
 """
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +27,16 @@ def _ai_client():
 logger = logging.getLogger("mayasec.agent")
 
 HISTORY_LIMIT = 10
+TIMEZONE = ZoneInfo("America/Sao_Paulo")
+
+
+def _saudacao() -> str:
+    hora = datetime.now(TIMEZONE).hour
+    if 5 <= hora < 12:
+        return "bom dia"
+    if 12 <= hora < 18:
+        return "boa tarde"
+    return "boa noite"
 
 SECURITY_RULES = (
     "Regras invioláveis:\n"
@@ -38,12 +50,24 @@ SECURITY_RULES = (
 )
 
 
-async def _build_system_prompt(db: AsyncSession, tenant, contact, conversation) -> str:
-    parts = [f"Você é a secretária virtual de {tenant.name}, atendendo via WhatsApp."]
+async def _build_system_prompt(
+    db: AsyncSession, tenant, contact, conversation, is_first: bool
+) -> str:
+    parts = [f"Você é a Secretária Virtual de {tenant.name}, atendendo via WhatsApp."]
     if tenant.voice_tone:
         parts.append(f"Tom de voz: {tenant.voice_tone}.")
     if contact.display_name:
         parts.append(f"Você está falando com {contact.display_name}.")
+
+    if is_first:
+        primeiro_nome = (contact.display_name or "").split(" ")[0] if contact.display_name else ""
+        nome_txt = f" {primeiro_nome}" if primeiro_nome else ""
+        parts.append(
+            "Esta é a PRIMEIRA mensagem desta conversa. Comece a resposta cumprimentando "
+            f"exatamente neste estilo: \"Olá{nome_txt}, {_saudacao()}! Sou a Secretária Virtual "
+            f"de {tenant.name}. Em que posso ajudar?\" — e só depois trate o que a pessoa pediu, "
+            "se ela já tiver pedido algo."
+        )
 
     # FAQ (knowledge_base) ativa do tenant
     faq = (
@@ -97,8 +121,9 @@ async def respond(
     user_text: str,
 ) -> str:
     """Gera a resposta da secretária para a mensagem recebida."""
-    system_prompt = await _build_system_prompt(db, tenant, contact, conversation)
     history = await _load_history(db, conversation, exclude_last_inbound=True)
+    is_first = len(history) == 0
+    system_prompt = await _build_system_prompt(db, tenant, contact, conversation, is_first)
 
     active_tools = await registry.get_active_tools(db, tenant)
     declarations = [t.to_function_declaration() for t in active_tools]
