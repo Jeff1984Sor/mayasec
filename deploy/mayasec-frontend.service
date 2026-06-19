@@ -1,0 +1,19 @@
+[Unit]
+Description=MayaSec Frontend (Next.js) — porta 3001
+After=network.target mayasec-backend.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/mayasec/frontend
+EnvironmentFile=/home/deploy/mayasec/frontend/.env.local
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mayasec-frontend
+
+[Install]
+WantedBy=multi-user.target

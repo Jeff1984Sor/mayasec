@@ -40,4 +40,38 @@ sudo systemctl restart mayasec-backend
 ```
 
 ## Frontend — `mayasec-frontend.service`
-Será adicionado na Etapa 7 (Next.js na porta 3001).
+
+Next.js na porta **3001**. Requer Node.js 18+ e npm na VM.
+
+### Instalar / atualizar
+```bash
+# 0. (uma vez) Node.js 20 LTS, se ainda não tiver
+node -v || (curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs)
+
+cd ~/mayasec/frontend
+cp .env.local.example .env.local
+nano .env.local
+#   NEXT_PUBLIC_API_BASE_URL=http://SEU_IP:8011   (backend visto pelo navegador)
+#   API_BASE_URL=http://localhost:8011            (backend visto pelo servidor Next)
+#   NEXTAUTH_URL=http://SEU_IP:3001
+#   NEXTAUTH_SECRET=...   (openssl rand -base64 32)
+
+npm install
+npm run build            # gera o .next de produção
+
+# Serviço
+sudo cp ~/mayasec/deploy/mayasec-frontend.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mayasec-frontend
+sudo systemctl status mayasec-frontend
+```
+
+### Atualizar após git pull
+```bash
+cd ~/mayasec && git pull
+cd frontend && npm install && npm run build
+sudo systemctl restart mayasec-frontend
+```
+
+> O backend precisa liberar CORS para a origem do painel — já está em `CORS_ORIGINS`
+> no `.env` do backend (ajuste para o IP/domínio real do painel, ex.: `http://SEU_IP:3001`).

@@ -9,7 +9,9 @@ Pydantic v2 + PostgreSQL + Alembic. Porta **8011** (8001 já está ocupada no pr
 - [x] **Etapa 3** — máquina de estados (timeout 6h + respeita handoff), identificação do contato no sistema do cliente (`client_api` + mock), config da conexão via admin.
 - [x] **Etapa 4** — camada de tools (base + registry + client_api + 7 tools) + admin p/ ativar/listar tools.
 - [x] **Etapa 5** — núcleo IA: `gemini_client` (function calling) + `agent_service` (system prompt + FAQ + histórico + tools), plugado no webhook + admin de FAQ.
-- [ ] Etapa 6 — whatsapp_service + anti-flood.
+- [x] **Etapa 6** — whatsapp_service + anti-flood (absorvida nas etapas 2/5).
+- [x] **Etapa 7a** — auth do painel (users + JWT + bcrypt) + APIs do painel.
+- [x] **Etapa 7b** — frontend Next.js (5 telas) em `../frontend` (porta 3001).
 
 ## Estrutura (etapa 1)
 ```
