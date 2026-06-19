@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
-import { PageHeader, Card, EmptyState, Badge } from "@/components/ui";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiSend } from "@/lib/api";
+import { PageHeader, Card, EmptyState, Badge, Button } from "@/components/ui";
 
 const STATE_COLOR: Record<string, any> = {
   idle: "slate",
@@ -19,10 +19,29 @@ export default function ConversasPage() {
     queryFn: () => apiGet<any[]>("/panel/conversations"),
   });
 
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState("");
+
   const mensagens = useQuery({
     queryKey: ["messages", selected],
     queryFn: () => apiGet<any[]>(`/panel/conversations/${selected}/messages`),
     enabled: !!selected,
+  });
+
+  const selectedConv = conversas.data?.find((c) => c.id === selected);
+
+  const reply = useMutation({
+    mutationFn: (text: string) => apiSend("POST", `/panel/conversations/${selected}/reply`, { text }),
+    onSuccess: () => {
+      setDraft("");
+      qc.invalidateQueries({ queryKey: ["messages", selected] });
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+
+  const reactivate = useMutation({
+    mutationFn: () => apiSend("PATCH", `/panel/conversations/${selected}/state`, { state: "idle" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conversations"] }),
   });
 
   return (
@@ -50,27 +69,54 @@ export default function ConversasPage() {
           </ul>
         </Card>
 
-        <Card className="max-h-[70vh] overflow-auto">
+        <Card className="flex max-h-[70vh] flex-col">
           {!selected && <EmptyState message="Selecione uma conversa para ver o histórico." />}
-          {selected && mensagens.isLoading && <div className="text-slate-400">Carregando mensagens...</div>}
-          {selected && mensagens.data && (
-            <div className="flex flex-col gap-2">
-              {mensagens.data.map((m) => (
-                <div
-                  key={m.id}
-                  className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
-                    m.direction === "inbound"
-                      ? "self-start bg-slate-100"
-                      : "self-end bg-navy text-white"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">{m.body}</div>
-                  <div className={`mt-1 text-[10px] ${m.direction === "inbound" ? "text-slate-400" : "text-indigo"}`}>
-                    {new Date(m.created_at).toLocaleString("pt-BR")}
-                  </div>
+          {selected && (
+            <>
+              {selectedConv?.state === "handoff_humano" && (
+                <div className="mb-3 flex items-center justify-between rounded-lg bg-red/10 px-3 py-2 text-sm text-red">
+                  <span>Secretária pausada (atendimento humano)</span>
+                  <button onClick={() => reactivate.mutate()} className="font-semibold underline">
+                    Reativar secretária
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+
+              <div className="flex flex-1 flex-col gap-2 overflow-auto">
+                {mensagens.isLoading && <div className="text-slate-400">Carregando mensagens...</div>}
+                {mensagens.data?.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
+                      m.direction === "inbound" ? "self-start bg-slate-100" : "self-end bg-navy text-white"
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{m.body}</div>
+                    <div className={`mt-1 text-[10px] ${m.direction === "inbound" ? "text-slate-400" : "text-indigo"}`}>
+                      {new Date(m.created_at).toLocaleString("pt-BR")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <form
+                className="mt-3 flex gap-2 border-t border-slate-100 pt-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (draft.trim()) reply.mutate(draft.trim());
+                }}
+              >
+                <input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="Responder como humano..."
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo"
+                />
+                <Button type="submit" disabled={reply.isPending || !draft.trim()}>
+                  {reply.isPending ? "Enviando..." : "Enviar"}
+                </Button>
+              </form>
+            </>
           )}
         </Card>
       </div>

@@ -19,9 +19,14 @@ from app.models.conversation import Conversation
 from app.models.handoff import Handoff, HandoffStatus
 from app.models.knowledge_base import KnowledgeBase
 from app.models.message import Message
+from app.models.conversation import ConversationState
+from app.models.message import MessageDirection
 from app.models.tenant import Tenant
 from app.models.tool_config import ToolConfig
 from app.models.user import User
+from app.models.whatsapp_session import WhatsappSession
+from app.services import conversation_service as conv
+from app.services import whatsapp_service as wa
 from app.services.tools import registry
 
 router = APIRouter(prefix="/panel", tags=["panel"])
@@ -76,6 +81,68 @@ async def conversation_messages(
         }
         for m in msgs
     ]
+
+
+class ReplyIn(BaseModel):
+    text: str
+
+
+@router.post("/conversations/{conversation_id}/reply")
+async def reply_conversation(
+    conversation_id: uuid.UUID,
+    body: ReplyIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    conversation = await db.get(Conversation, conversation_id)
+    if conversation is None or conversation.tenant_id != user.tenant_id:
+        raise HTTPException(404, "conversa não encontrada")
+    contact = await db.get(Contact, conversation.contact_id)
+    tenant = await db.get(Tenant, user.tenant_id)
+
+    session = (
+        await db.execute(
+            select(WhatsappSession)
+            .where(WhatsappSession.tenant_id == user.tenant_id)
+            .where(WhatsappSession.is_active.is_(True))
+        )
+    ).scalars().first()
+    if session is None:
+        raise HTTPException(400, "nenhuma sessão WhatsApp configurada para enviar")
+
+    # Humano assumiu -> pausa a secretária
+    await conv.set_state(db, conversation, ConversationState.handoff_humano)
+    await conv.log_message(
+        db,
+        tenant=tenant,
+        conversation=conversation,
+        contact=contact,
+        direction=MessageDirection.outbound,
+        body=body.text,
+    )
+    try:
+        await wa.send_text(session_id=session.session_id, to=contact.phone_pn, text=body.text)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"mensagem registrada mas falha no envio: {exc}") from exc
+    return {"ok": True, "state": conversation.state.value}
+
+
+class StateIn(BaseModel):
+    state: ConversationState
+
+
+@router.patch("/conversations/{conversation_id}/state")
+async def set_conversation_state(
+    conversation_id: uuid.UUID,
+    body: StateIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    conversation = await db.get(Conversation, conversation_id)
+    if conversation is None or conversation.tenant_id != user.tenant_id:
+        raise HTTPException(404, "conversa não encontrada")
+    await conv.set_state(db, conversation, body.state)
+    return {"state": conversation.state.value}
 
 
 # ---------- Base de conhecimento (CRUD) ----------
