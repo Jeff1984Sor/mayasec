@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.core.security import get_cipher, mask_secret
 from app.models.contact import Contact
 from app.models.conversation import Conversation, ConversationState
+from app.models.knowledge_base import KnowledgeBase
 from app.models.tenant import Tenant
 from app.models.tool_config import ToolConfig
 from app.models.whatsapp_session import WhatsappSession
@@ -214,6 +215,29 @@ async def toggle_tool(body: ToolToggle, db: AsyncSession = Depends(get_db)):
     tc.is_enabled = body.is_enabled
     await db.flush()
     return {"tool_name": tc.tool_name, "is_enabled": tc.is_enabled}
+
+
+# ---------- Base de conhecimento (FAQ) ----------
+class FaqCreate(BaseModel):
+    tenant_slug: str
+    question: str
+    answer: str
+    tags: list[str] | None = None
+
+
+@router.post("/faq", status_code=201)
+async def create_faq(body: FaqCreate, db: AsyncSession = Depends(get_db)):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == body.tenant_slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{body.tenant_slug}' não encontrado")
+    faq = KnowledgeBase(
+        tenant_id=tenant.id, question=body.question, answer=body.answer, tags=body.tags
+    )
+    db.add(faq)
+    await db.flush()
+    return {"id": str(faq.id), "question": faq.question}
 
 
 @router.get("/tenants/{slug}/active-tools")

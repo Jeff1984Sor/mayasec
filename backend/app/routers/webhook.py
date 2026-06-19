@@ -20,6 +20,7 @@ from app.core.security import get_cipher
 from app.models.conversation import ConversationState
 from app.models.message import MessageDirection
 from app.schemas.webhook import WasenderWebhook
+from app.services import agent_service
 from app.services import contact_identity as identity
 from app.services import conversation_service as conv
 from app.services import whatsapp_service as wa
@@ -129,13 +130,18 @@ async def wasender_webhook(
         # Um humano assumiu — a secretária NÃO responde (só registrou a mensagem).
         return _ok("human_handoff")
 
-    if conversation.state == ConversationState.aguardando_confirmacao:
-        # A IA interpreta a confirmação (etapa 5). Por ora, placeholder.
-        nome = contact.display_name or "tudo bem"
-        reply = f"Recebi sua resposta, {nome}! (interpretação da confirmação entra na etapa 5)"
-    else:
-        nome = contact.display_name or "Oi"
-        reply = f"{nome}, sou a secretária virtual. (a IA entra na etapa 5)"
+    # IA responde (interpreta confirmação no estado aguardando_confirmacao também).
+    try:
+        reply = await agent_service.respond(
+            db,
+            tenant=tenant,
+            contact=contact,
+            conversation=conversation,
+            user_text=msg.message_body or "",
+        )
+    except Exception:  # noqa: BLE001 — não derruba o webhook se a IA falhar
+        logger.exception("agent_service falhou")
+        reply = "Recebi sua mensagem! Já já te respondo."
 
     # --- Anti-flood antes de responder ---
     if await wa.is_flooding(db, tenant, contact.id):

@@ -8,7 +8,7 @@ Pydantic v2 + PostgreSQL + Alembic. Porta **8011** (8001 já está ocupada no pr
 - [x] **Etapa 2** — gateway webhook (`/webhook/wasender`, 3 filtros anti-conflito + log + anti-flood) + router admin p/ provisionar tenant/sessão.
 - [x] **Etapa 3** — máquina de estados (timeout 6h + respeita handoff), identificação do contato no sistema do cliente (`client_api` + mock), config da conexão via admin.
 - [x] **Etapa 4** — camada de tools (base + registry + client_api + 7 tools) + admin p/ ativar/listar tools.
-- [ ] Etapa 5 — gemini_client + agent_service.
+- [x] **Etapa 5** — núcleo IA: `gemini_client` (function calling) + `agent_service` (system prompt + FAQ + histórico + tools), plugado no webhook + admin de FAQ.
 - [ ] Etapa 6 — whatsapp_service + anti-flood.
 
 ## Estrutura (etapa 1)
