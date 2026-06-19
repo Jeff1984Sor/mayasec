@@ -19,6 +19,7 @@ dependencies = [
     "pyjwt>=2.8",
     "bcrypt>=4.1",
     "openpyxl>=3.1",
+    "pypdf>=4.2",
     "python-multipart>=0.0.9",
 ]
 

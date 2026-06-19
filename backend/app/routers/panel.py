@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.core.security import get_cipher
+from app.services.doc_import import fetch_document_text
 from app.services.faq_import import build_template_xlsx, parse_faq_file
 from app.models.contact import Contact
 from app.models.conversation import Conversation
@@ -296,6 +297,50 @@ async def upload_faq(
         db.add(KnowledgeBase(tenant_id=user.tenant_id, question=q, answer=a))
     await db.flush()
     return {"inseridas": len(pares), "replace": replace}
+
+
+class ImportDocIn(BaseModel):
+    url: str
+    titulo: str | None = None
+
+
+class EnrichIn(BaseModel):
+    question: str
+    answer: str
+
+
+@router.post("/knowledge-base/enrich")
+async def enrich_faq(body: EnrichIn, user: User = Depends(get_current_user)):
+    from app.services.ai_text import improve_faq
+
+    try:
+        return await improve_faq(body.question, body.answer)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"falha ao enriquecer com IA: {exc}") from exc
+
+
+@router.post("/knowledge-base/import-doc", status_code=201)
+async def import_doc(
+    body: ImportDocIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        texto = await fetch_document_text(body.url)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            400,
+            f"não consegui ler o documento (ele está compartilhado como 'qualquer pessoa com o link'?): {exc}",
+        ) from exc
+    texto = (texto or "").strip()
+    if not texto:
+        raise HTTPException(400, "documento vazio ou sem texto extraível")
+    titulo = (body.titulo or "Documento importado").strip()
+    db.add(
+        KnowledgeBase(tenant_id=user.tenant_id, question=titulo, answer=texto[:30000])
+    )
+    await db.flush()
+    return {"titulo": titulo, "caracteres": len(texto)}
 
 
 @router.post("/knowledge-base", status_code=201)

@@ -55,6 +55,32 @@ export default function BaseConhecimentoPage() {
     e.target.value = "";
   }
 
+  const importDoc = useMutation({
+    mutationFn: ({ url, titulo }: { url: string; titulo: string }) =>
+      apiSend("POST", "/panel/knowledge-base/import-doc", { url, titulo }),
+    onSuccess: (r: any) => {
+      setUploadMsg(`Documento importado (${r.caracteres} caracteres).`);
+      qc.invalidateQueries({ queryKey: ["faq"] });
+      setTimeout(() => setUploadMsg(""), 4000);
+    },
+    onError: () => setUploadMsg("Falha ao importar. O documento está público (qualquer pessoa com o link)?"),
+  });
+
+  function onImportDoc() {
+    const url = window.prompt("Cole o link do Google Docs/Drive (precisa estar público):");
+    if (!url) return;
+    const titulo = window.prompt("Título do conteúdo (ex.: Regras do estúdio):") || "Documento importado";
+    importDoc.mutate({ url, titulo });
+  }
+
+  const enrich = useMutation({
+    mutationFn: () => apiSend("POST", "/panel/knowledge-base/enrich", { question, answer }),
+    onSuccess: (r: any) => {
+      setQuestion(r.question);
+      setAnswer(r.answer);
+    },
+  });
+
   function openNew() {
     setEditing(null);
     setQuestion("");
@@ -75,6 +101,9 @@ export default function BaseConhecimentoPage() {
         subtitle="Perguntas e respostas que a secretária usa"
         action={
           <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={onImportDoc} disabled={importDoc.isPending}>
+              {importDoc.isPending ? "Importando..." : "↓ Importar do Docs"}
+            </Button>
             <Button variant="ghost" onClick={() => apiDownload("/panel/knowledge-base/template", "modelo-faq.xlsx")}>
               ↓ Baixar planilha
             </Button>
@@ -120,9 +149,14 @@ export default function BaseConhecimentoPage() {
         <input value={question} onChange={(e) => setQuestion(e.target.value)} className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo" />
         <label className="mb-1 block text-sm font-medium">Resposta</label>
         <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={4} className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-indigo" />
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>Salvar</Button>
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="ghost" onClick={() => enrich.mutate()} disabled={enrich.isPending || !question.trim()}>
+            {enrich.isPending ? "Enriquecendo..." : "✨ Enriquecer com IA"}
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={() => save.mutate()} disabled={save.isPending}>Salvar</Button>
+          </div>
         </div>
       </Modal>
     </div>
