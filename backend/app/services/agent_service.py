@@ -8,13 +8,19 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.conversation import ConversationState
 from app.models.knowledge_base import KnowledgeBase
 from app.models.message import Message, MessageDirection
 from app.services import conversation_service as conv
-from app.services import gemini_client
+from app.services import gemini_client, openai_client
 from app.services.tools import registry
 from app.services.tools.base import ToolContext
+
+
+def _ai_client():
+    """Seleciona o provedor de IA ativo (ambos expõem run_chat com a mesma assinatura)."""
+    return gemini_client if settings.ai_provider == "gemini" else openai_client
 
 logger = logging.getLogger("mayasec.agent")
 
@@ -104,7 +110,7 @@ async def respond(
             return {"erro": f"ferramenta {name} não encontrada"}
         return await tool.run(ctx, **args)
 
-    reply = await gemini_client.run_chat(
+    reply = await _ai_client().run_chat(
         system_instruction=system_prompt,
         history=history,
         user_text=user_text,

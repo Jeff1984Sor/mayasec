@@ -29,7 +29,14 @@ class Settings(BaseSettings):
         description="postgresql+asyncpg://user:pass@host:5432/mayasec",
     )
 
-    # --- Gemini (núcleo IA) ---
+    # --- Provedor de IA ---
+    ai_provider: str = Field(default="openai")  # openai | gemini
+
+    # --- OpenAI (núcleo IA) ---
+    openai_api_key: str = Field(default="")
+    openai_model: str = Field(default="gpt-4o-mini")
+
+    # --- Gemini (alternativa) ---
     gemini_api_key: str = Field(default="")
     gemini_model: str = Field(default="gemini-1.5-flash")
 
