@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # --- Confirmação de aula: timeout do estado aguardando_confirmacao (6h) ---
     confirmation_timeout_seconds: int = 21600
 
+    # --- Auth do painel (JWT) ---
+    jwt_secret: str = Field(default="troque-este-segredo-no-env")
+    jwt_expire_minutes: int = Field(default=720)  # 12h
+
     # --- CORS (painel Next.js na 3000) ---
     cors_origins: str = Field(default="http://localhost:3001")  # 3000 já ocupada no prod2
 

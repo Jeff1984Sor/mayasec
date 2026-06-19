@@ -11,8 +11,10 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import hash_password
 from app.core.database import get_db
 from app.core.security import get_cipher, mask_secret
+from app.models.user import User
 from app.models.contact import Contact
 from app.models.conversation import Conversation, ConversationState
 from app.models.knowledge_base import KnowledgeBase
@@ -215,6 +217,38 @@ async def toggle_tool(body: ToolToggle, db: AsyncSession = Depends(get_db)):
     tc.is_enabled = body.is_enabled
     await db.flush()
     return {"tool_name": tc.tool_name, "is_enabled": tc.is_enabled}
+
+
+# ---------- Usuários do painel ----------
+class UserCreate(BaseModel):
+    tenant_slug: str
+    email: str
+    password: str
+    name: str | None = None
+    role: str = "owner"
+
+
+@router.post("/users", status_code=201)
+async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
+    tenant = (
+        await db.execute(select(Tenant).where(Tenant.slug == body.tenant_slug))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(404, f"tenant '{body.tenant_slug}' não encontrado")
+    email = body.email.lower().strip()
+    dup = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if dup:
+        raise HTTPException(409, f"email '{email}' já cadastrado")
+    user = User(
+        tenant_id=tenant.id,
+        email=email,
+        name=body.name,
+        password_hash=hash_password(body.password),
+        role=body.role,
+    )
+    db.add(user)
+    await db.flush()
+    return {"id": str(user.id), "email": user.email, "tenant_slug": tenant.slug}
 
 
 # ---------- Base de conhecimento (FAQ) ----------

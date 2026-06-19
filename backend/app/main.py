@@ -29,9 +29,9 @@ async def health() -> dict:
 
 
 # --- Routers ---
-from app.routers import webhook, admin  # noqa: E402
+from app.routers import webhook, admin, auth, panel  # noqa: E402
 
 app.include_router(webhook.router)
 app.include_router(admin.router)
-
-# Próximas etapas: knowledge_base, tool_config, conversations, messages (CRUD do painel)
+app.include_router(auth.router)
+app.include_router(panel.router)

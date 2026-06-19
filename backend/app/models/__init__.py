@@ -7,8 +7,10 @@ from app.models.message import Message, MessageDirection
 from app.models.knowledge_base import KnowledgeBase
 from app.models.tool_config import ToolConfig
 from app.models.handoff import Handoff, HandoffStatus
+from app.models.user import User
 
 __all__ = [
+    "User",
     "Tenant",
     "WhatsappSession",
     "Contact",
