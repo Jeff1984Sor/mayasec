@@ -38,6 +38,13 @@ def _saudacao() -> str:
         return "boa tarde"
     return "boa noite"
 
+CORDIALIDADE = (
+    "Seja sempre cordial, calorosa e gente boa — como uma recepcionista simpática que "
+    "conhece a aluna. Quando souber o nome da pessoa, chame-a pelo PRIMEIRO nome de forma "
+    "natural ao longo da conversa (sem exagerar). Use uma linguagem acolhedora e positiva, "
+    "com no máximo um emoji ocasional quando fizer sentido."
+)
+
 SECURITY_RULES = (
     "Regras invioláveis:\n"
     "- NUNCA invente dados de fatura, agenda, valores ou datas. Se a informação não veio "
@@ -87,6 +94,7 @@ async def _build_system_prompt(
             "resposta dele e, se confirmar ou cancelar, use a ferramenta confirmar_presenca."
         )
 
+    parts.append(CORDIALIDADE)
     parts.append(SECURITY_RULES)
     return "\n\n".join(parts)
 

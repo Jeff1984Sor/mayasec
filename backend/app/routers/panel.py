@@ -4,7 +4,8 @@ Alimenta as 5 telas: Conversas, Base de conhecimento, Tools, Configurações, Ha
 """
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.core.security import get_cipher
+from app.services.faq_import import build_template_xlsx, parse_faq_file
 from app.models.contact import Contact
 from app.models.conversation import Conversation
 from app.models.handoff import Handoff, HandoffStatus
@@ -104,6 +106,38 @@ async def list_faq(user: User = Depends(get_current_user), db: AsyncSession = De
         )
     ).scalars().all()
     return [_faq_out(f) for f in rows]
+
+
+@router.get("/knowledge-base/template")
+async def faq_template(user: User = Depends(get_current_user)):
+    data = build_template_xlsx()
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="modelo-faq.xlsx"'},
+    )
+
+
+@router.post("/knowledge-base/upload", status_code=201)
+async def upload_faq(
+    file: UploadFile = File(...),
+    replace: bool = Form(False),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    content = await file.read()
+    pares = parse_faq_file(file.filename, content)
+    if not pares:
+        raise HTTPException(400, "nenhuma linha válida (esperado 2 colunas: pergunta, resposta)")
+    if replace:
+        for f in (
+            await db.execute(select(KnowledgeBase).where(KnowledgeBase.tenant_id == user.tenant_id))
+        ).scalars().all():
+            await db.delete(f)
+    for q, a in pares:
+        db.add(KnowledgeBase(tenant_id=user.tenant_id, question=q, answer=a))
+    await db.flush()
+    return {"inseridas": len(pares), "replace": replace}
 
 
 @router.post("/knowledge-base", status_code=201)

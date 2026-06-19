@@ -18,6 +18,28 @@ export async function apiGet<T = any>(path: string): Promise<T> {
   return res.json();
 }
 
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { headers: { ...(await authHeader()) } });
+  if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function apiUpload<T = any>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { ...(await authHeader()) },
+    body: formData,
+  });
+  if (!res.ok) throw new Error(`POST ${path} -> ${res.status}`);
+  return res.json();
+}
+
 export async function apiSend<T = any>(
   method: "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,

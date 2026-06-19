@@ -4,8 +4,6 @@ Etapa 2: só o suficiente pra cadastrar o primeiro tenant (PilatesFinal) e a ses
 da Flavia, e assim conseguir testar o webhook ponta a ponta. O CRUD completo do
 painel vem nas próximas etapas.
 """
-import csv
-import io
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -24,6 +22,7 @@ from app.models.tenant import Tenant
 from app.models.tool_config import ToolConfig
 from app.models.whatsapp_session import WhatsappSession
 from app.services import conversation_service as conv
+from app.services.faq_import import parse_faq_file
 from app.services.tools import registry
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -318,36 +317,6 @@ async def create_faq_bulk(body: FaqBulk, db: AsyncSession = Depends(get_db)):
     return {"inseridas": len(body.items), "replace": body.replace}
 
 
-def _parse_faq_file(filename: str, content: bytes) -> list[tuple[str, str]]:
-    """Lê pares (pergunta, resposta) de um .xlsx (col A/B) ou .csv (2 colunas)."""
-    name = (filename or "").lower()
-    pares: list[tuple[str, str]] = []
-
-    if name.endswith(".xlsx"):
-        from openpyxl import load_workbook
-
-        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-        ws = wb.active
-        for row in ws.iter_rows(values_only=True):
-            if not row or len(row) < 2:
-                continue
-            q, a = row[0], row[1]
-            if q is None or a is None:
-                continue
-            pares.append((str(q).strip(), str(a).strip()))
-    else:  # csv
-        text = content.decode("utf-8-sig", errors="replace")
-        for row in csv.reader(io.StringIO(text)):
-            if len(row) < 2 or not row[0].strip() or not row[1].strip():
-                continue
-            pares.append((row[0].strip(), row[1].strip()))
-
-    # Remove cabeçalho comum (pergunta/resposta, question/answer)
-    if pares and pares[0][0].lower() in {"pergunta", "question", "perguntas"}:
-        pares = pares[1:]
-    return pares
-
-
 @router.post("/faq/upload", status_code=201)
 async def upload_faq(
     tenant_slug: str = Form(...),
@@ -362,7 +331,7 @@ async def upload_faq(
         raise HTTPException(404, f"tenant '{tenant_slug}' não encontrado")
 
     content = await file.read()
-    pares = _parse_faq_file(file.filename, content)
+    pares = parse_faq_file(file.filename, content)
     if not pares:
         raise HTTPException(400, "nenhuma linha válida encontrada (esperado 2 colunas: pergunta, resposta)")
 

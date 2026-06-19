@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiSend } from "@/lib/api";
+import { apiGet, apiSend, apiDownload, apiUpload } from "@/lib/api";
 import { PageHeader, Card, Button, EmptyState, Modal, Badge } from "@/components/ui";
 
 type Faq = { id: string; question: string; answer: string; tags: string[] | null; is_active: boolean };
@@ -31,6 +31,30 @@ export default function BaseConhecimentoPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["faq"] }),
   });
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadMsg, setUploadMsg] = useState("");
+
+  const upload = useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("replace", "false");
+      return apiUpload("/panel/knowledge-base/upload", fd);
+    },
+    onSuccess: (r: any) => {
+      setUploadMsg(`${r.inseridas} pergunta(s) importada(s)!`);
+      qc.invalidateQueries({ queryKey: ["faq"] });
+      setTimeout(() => setUploadMsg(""), 4000);
+    },
+    onError: () => setUploadMsg("Falha ao importar. Confira o arquivo (2 colunas)."),
+  });
+
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) upload.mutate(f);
+    e.target.value = "";
+  }
+
   function openNew() {
     setEditing(null);
     setQuestion("");
@@ -49,8 +73,29 @@ export default function BaseConhecimentoPage() {
       <PageHeader
         title="Base de conhecimento"
         subtitle="Perguntas e respostas que a secretária usa"
-        action={<Button onClick={openNew}>+ Nova pergunta</Button>}
+        action={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => apiDownload("/panel/knowledge-base/template", "modelo-faq.xlsx")}>
+              ↓ Baixar planilha
+            </Button>
+            <Button variant="ghost" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
+              {upload.isPending ? "Importando..." : "↑ Subir planilha"}
+            </Button>
+            <Button onClick={openNew}>+ Nova pergunta</Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.csv"
+              className="hidden"
+              onChange={onPickFile}
+            />
+          </div>
+        }
       />
+
+      {uploadMsg && (
+        <div className="mb-4 rounded-lg bg-teal/10 px-3 py-2 text-sm text-teal">{uploadMsg}</div>
+      )}
 
       {faqs.data?.length === 0 && <EmptyState message="Nenhuma FAQ cadastrada." />}
 
