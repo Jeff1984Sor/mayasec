@@ -65,6 +65,19 @@ export default function ConversasPage() {
     e.target.value = "";
   }
 
+  const rename = useMutation({
+    mutationFn: ({ contactId, name }: { contactId: string; name: string }) =>
+      apiSend("PATCH", `/panel/contacts/${contactId}`, { name }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["conversations"] }),
+  });
+
+  function onRename() {
+    if (!selectedConv) return;
+    const atual = selectedConv.contact.name || "";
+    const novo = window.prompt("Nome do contato:", atual);
+    if (novo !== null) rename.mutate({ contactId: selectedConv.contact.id, name: novo });
+  }
+
   return (
     <div>
       <PageHeader title="Conversas" subtitle="Histórico de atendimentos por contato" />
@@ -94,6 +107,16 @@ export default function ConversasPage() {
           {!selected && <EmptyState message="Selecione uma conversa para ver o histórico." />}
           {selected && (
             <>
+              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <div className="font-semibold">{selectedConv?.contact.name || selectedConv?.contact.phone_pn}</div>
+                  <div className="text-xs text-slate-400">{selectedConv?.contact.phone_pn}</div>
+                </div>
+                <button onClick={onRename} title="Editar nome do contato" className="rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100">
+                  ✏️ Editar nome
+                </button>
+              </div>
+
               {selectedConv?.state === "handoff_humano" && (
                 <div className="mb-3 flex items-center justify-between rounded-lg bg-red/10 px-3 py-2 text-sm text-red">
                   <span>Secretária pausada (atendimento humano)</span>

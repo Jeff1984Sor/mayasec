@@ -83,6 +83,25 @@ async def conversation_messages(
     ]
 
 
+class ContactRename(BaseModel):
+    name: str
+
+
+@router.patch("/contacts/{contact_id}")
+async def rename_contact(
+    contact_id: uuid.UUID,
+    body: ContactRename,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    contact = await db.get(Contact, contact_id)
+    if contact is None or contact.tenant_id != user.tenant_id:
+        raise HTTPException(404, "contato não encontrado")
+    contact.display_name = body.name.strip() or None
+    await db.flush()
+    return {"id": str(contact.id), "name": contact.display_name}
+
+
 class ReplyIn(BaseModel):
     text: str
 
